@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>⚖️ 초등 3학년 수학 - 양팔저울 무게 재기</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@500;700;900&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+            touch-action: manipulation;
+        }
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: #f0fdf4;
+            user-select: none;
+            -webkit-user-select: none;
+            overflow: hidden; /* 태블릿 스크롤 금지 */
+            height: 100vh;
+            width: 100vw;
+        }
+        .font-jua {
+            font-family: 'Jua', sans-serif;
+        }
+        /* 저울 대 및 접시 기울기 애니메이션 */
+        .beam-group {
+            transition: transform 0.45s cubic-bezier(0.34, 1.3, 0.64, 1);
+            transform-origin: 250px 140px;
+        }
+        .pan-group-left {
+            transition: transform 0.45s cubic-bezier(0.34, 1.3, 0.64, 1);
+            transform-origin: 90px 140px;
+        }
+        .pan-group-right {
+            transition: transform 0.45s cubic-bezier(0.34, 1.3, 0.64, 1);
+            transform-origin: 410px 140px;
+        }
+        .item-pop {
+            animation: popIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+        @keyframes popIn {
+            0% { transform: scale(0.2); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .plate-scroll::-webkit-scrollbar {
+            width: 3px;
+            height: 3px;
+        }
+        .plate-scroll::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="flex flex-col h-screen w-screen p-2 md:p-3 gap-1.5">
+
+    <!-- 상단 헤더 -->
+    <header class="bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white px-4 py-1.5 rounded-2xl shadow-md flex items-center justify-between shrink-0 h-10">
+        <div class="flex items-center space-x-2">
+            <i data-lucide="scale" class="w-5 h-5 text-yellow-300"></i>
+            <h1 class="text-sm md:text-base font-black font-jua text-yellow-300 tracking-wide">⚖️ 양팔저울로 무게를 재어보아요</h1>
+            <span class="bg-emerald-800/80 text-emerald-100 text-[10px] px-2 py-0.5 rounded-full font-bold hidden sm:inline">초등 3학년 수학</span>
+        </div>
+        
+        <div class="flex items-center gap-2">
+            <button id="sound-toggle" onclick="toggleSound()" class="bg-emerald-800/80 hover:bg-emerald-900 active:scale-95 px-2.5 py-0.5 rounded-xl text-xs font-bold flex items-center gap-1 transition border border-emerald-500/40">
+                <i data-lucide="volume-2" id="sound-icon" class="w-3.5 h-3.5 text-yellow-300"></i>
+                <span id="sound-text" class="hidden sm:inline">소리 켜짐</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- 메인 대시보드 (100vh 한 화면) -->
+    <main class="flex flex-col gap-1.5 flex-1 min-h-0">
+
+        <!-- 저울 무대 카드 -->
+        <div class="bg-white rounded-2xl p-2 shadow-md border-2 border-emerald-200 flex-1 flex flex-col justify-between relative min-h-0 overflow-hidden">
+            
+            <!-- 상단 조작 바 (물건 선택 + 접시 비우기) -->
+            <div class="flex flex-col sm:flex-row items-center justify-between gap-1.5 shrink-0 z-20">
+                <!-- 물건 선택 -->
+                <div class="flex items-center gap-1 bg-emerald-50 p-1 rounded-xl border border-emerald-200 w-full sm:w-auto justify-center">
+                    <span class="text-xs font-black text-emerald-900 font-jua px-1">무게 재기 물건:</span>
+                    <button id="target-eraser" onclick="selectTarget('eraser')" class="flex-1 sm:flex-initial px-3 py-1 rounded-lg text-xs font-black font-jua transition shadow-sm bg-white text-emerald-800 border-2 border-emerald-500 flex items-center justify-center gap-1">
+                        <span class="text-base">🧽</span> 지우개
+                    </button>
+                    <button id="target-tape" onclick="selectTarget('tape')" class="flex-1 sm:flex-initial px-3 py-1 rounded-lg text-xs font-black font-jua transition text-slate-600 hover:bg-white/80 border-2 border-transparent flex items-center justify-center gap-1">
+                        <span class="text-base">🩹</span> 투명테이프
+                    </button>
+                </div>
+
+                <!-- 수평 상태 알림 & 접시 비우기 -->
+                <div class="flex items-center gap-1.5 w-full sm:w-auto justify-end">
+                    <div id="scale-status" class="bg-slate-100 text-slate-700 px-3 py-1 rounded-full text-xs font-black border border-slate-200 flex items-center gap-1 shadow-sm transition-all duration-300 flex-1 sm:flex-initial justify-center font-jua">
+                        <span class="w-2 h-2 rounded-full bg-slate-400"></span> 오른쪽 접시에 단위 물건을 올려놓아 보세요!
+                    </div>
+                    
+                    <!-- 접시 비우기 버튼 -->
+                    <button onclick="resetScale()" class="bg-rose-500 hover:bg-rose-600 active:scale-95 text-white px-2.5 py-1 rounded-xl text-xs font-black flex items-center gap-1 shadow transition font-jua shrink-0">
+                        <span>🧹</span> 접시 비우기
+                    </button>
+                </div>
+            </div>
+
+            <!-- 저울 정중앙 무대 (Vertical & Horizontal Centering, 넉넉한 여백) -->
+            <div class="relative bg-gradient-to-b from-sky-100/60 via-sky-50/20 to-emerald-100/40 rounded-xl flex-1 flex items-center justify-center my-1 border border-sky-100 select-none overflow-hidden min-h-0 p-1">
+                
+                <svg id="scale-svg" class="w-full h-full max-h-full max-w-full overflow-visible" viewBox="0 0 500 320" preserveAspectRatio="xMidYMid meet">
+                    <!-- 1. 저울 고정 밑받침대 & 중앙 기둥 -->
+                    <g id="scale-base">
+                        <rect x="200" y="275" width="100" height="12" rx="6" fill="#334155" />
+                        <polygon points="250,135 228,275 272,275" fill="url(#base-gradient)" />
+                        <!-- 회전 중심 핀 -->
+                        <circle cx="250" cy="140" r="10" fill="#f59e0b" stroke="#78350f" stroke-width="3" />
+                        <circle cx="250" cy="140" r="4" fill="#1e293b" />
+                    </g>
+
+                    <defs>
+                        <linearGradient id="base-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#64748b" />
+                            <stop offset="100%" stop-color="#334155" />
+                        </linearGradient>
+                        <linearGradient id="beam-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" stop-color="#b45309" />
+                            <stop offset="50%" stop-color="#f59e0b" />
+                            <stop offset="100%" stop-color="#b45309" />
+                        </linearGradient>
+                    </defs>
+
+                    <!-- 2. 회전하는 저울 대 & 접시 그룹 -->
+                    <g id="beam-group" class="beam-group">
+                        <!-- 저울 대 (Beam) -->
+                        <rect x="80" y="134" width="340" height="12" rx="6" fill="url(#beam-gradient)" stroke="#78350f" stroke-width="2" />
+                        <circle cx="90" cy="140" r="6" fill="#475569" stroke="#1e293b" stroke-width="2" />
+                        <circle cx="410" cy="140" r="6" fill="#475569" stroke="#1e293b" stroke-width="2" />
+
+                        <!-- 2-A. 왼쪽 접시 그룹 (평행 유지) -->
+                        <g id="pan-group-left" class="pan-group-left">
+                            <!-- 실 / 줄 -->
+                            <line x1="90" y1="140" x2="45" y2="215" stroke="#64748b" stroke-width="2.5" stroke-linecap="round" />
+                            <line x1="90" y1="140" x2="135" y2="215" stroke="#64748b" stroke-width="2.5" stroke-linecap="round" />
+                            
+                            <!-- 접시 바닥 -->
+                            <path d="M 35,215 L 145,215 Q 90,245 35,215 Z" fill="#e2e8f0" stroke="#64748b" stroke-width="3" />
+                            
+                            <!-- 접시 위 물건 배치 HTML -->
+                            <foreignObject x="30" y="155" width="120" height="60">
+                                <div xmlns="http://www.w3.org/1999/xhtml" class="w-full h-full flex flex-wrap content-end justify-center p-1" id="left-plate-html">
+                                    <!-- JS 물건 생성 -->
+                                </div>
+                            </foreignObject>
+
+                            <!-- 라벨 -->
+                            <foreignObject x="25" y="238" width="130" height="30">
+                                <div xmlns="http://www.w3.org/1999/xhtml" class="flex justify-center">
+                                    <span id="label-left-name" class="text-xs font-black text-emerald-900 bg-white/95 px-2.5 py-0.5 rounded-full shadow border border-emerald-300 font-jua">
+                                        지우개
+                                    </span>
+                                </div>
+                            </foreignObject>
+                        </g>
+
+                        <!-- 2-B. 오른쪽 접시 그룹 (평행 유지) -->
+                        <g id="pan-group-right" class="pan-group-right">
+                            <!-- 실 / 줄 -->
+                            <line x1="410" y1="140" x2="365" y2="215" stroke="#64748b" stroke-width="2.5" stroke-linecap="round" />
+                            <line x1="410" y1="140" x2="455" y2="215" stroke="#64748b" stroke-width="2.5" stroke-linecap="round" />
+                            
+                            <!-- 접시 바닥 -->
+                            <path d="M 355,215 L 465,215 Q 410,245 355,215 Z" fill="#e2e8f0" stroke="#64748b" stroke-width="3" />
+                            
+                            <!-- 접시 위 물건 배치 HTML -->
+                            <foreignObject x="350" y="155" width="120" height="60">
+                                <div xmlns="http://www.w3.org/1999/xhtml" class="w-full h-full plate-scroll overflow-y-auto flex flex-wrap content-end justify-center p-1 gap-0.5" id="right-plate-html">
+                                    <!-- JS 단위 물건 생성 -->
+                                </div>
+                            </foreignObject>
+
+                            <!-- 라벨 -->
+                            <foreignObject x="345" y="238" width="130" height="30">
+                                <div xmlns="http://www.w3.org/1999/xhtml" class="flex justify-center">
+                                    <span class="text-xs font-black text-teal-900 bg-white/95 px-2.5 py-0.5 rounded-full shadow border border-teal-300 font-jua">
+                                        단위 물건
+                                    </span>
+                                </div>
+                            </foreignObject>
+                        </g>
+
+                    </g>
+                </svg>
+
+            </div>
+
+        </div>
+
+        <!-- 하단 단위 물건 조작부 (2x2 격자 배치) -->
+        <div class="bg-white rounded-2xl p-2 shadow-md border-2 border-teal-200 shrink-0">
+            <div class="flex items-center justify-between mb-1 px-1">
+                <h2 class="text-xs font-black text-teal-950 font-jua flex items-center gap-1">
+                    <i data-lucide="shapes" class="w-3.5 h-3.5 text-teal-600"></i>
+                    오른쪽 접시 단위 물건 조작 (+ / -)
+                </h2>
+                <span class="text-[11px] font-bold text-slate-500">버튼을 눌러 수량을 맞춰보세요</span>
+            </div>
+
+            <!-- 2x2 카드로 배치 -->
+            <div class="grid grid-cols-2 gap-1.5" id="unit-controls-grid">
+                <!-- 자바스크립트로 생성됨 -->
+            </div>
+        </div>
+
+        <!-- 최하단 생각 다지기 바 -->
+        <div class="bg-amber-50 rounded-xl p-1.5 shadow border border-amber-200 shrink-0 flex items-center justify-between gap-2">
+            <div class="flex items-center gap-1.5 text-xs font-extrabold text-amber-950 truncate">
+                <span class="text-base">🤔</span>
+                <span class="font-jua text-xs md:text-sm text-amber-900 shrink-0">단원 마무리:</span>
+                <span class="truncate text-amber-800 font-semibold text-[11px] md:text-xs">서로 다른 단위 물건으로 무게를 재면 왜 불편할까요?</span>
+            </div>
+            
+            <button onclick="toggleHint()" class="bg-amber-400 hover:bg-amber-500 active:scale-95 text-amber-950 font-black px-2.5 py-1 rounded-lg text-xs font-jua transition shrink-0 shadow-sm flex items-center gap-1">
+                <i data-lucide="sparkles" class="w-3 h-3"></i> 힌트 보기
+            </button>
+        </div>
+
+    </main>
+
+    <!-- 힌트 모달 -->
+    <div id="hint-overlay" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-40 hidden flex items-end justify-center p-3" onclick="toggleHint()">
+        <div class="bg-white rounded-2xl max-w-md w-full p-4 border-2 border-amber-400 shadow-2xl space-y-2 text-slate-800" onclick="event.stopPropagation()">
+            <div class="flex items-center justify-between border-b border-amber-100 pb-2">
+                <h3 class="font-black font-jua text-base text-amber-900 flex items-center gap-1">
+                    💡 생각 다지기 & 힌트
+                </h3>
+                <button onclick="toggleHint()" class="text-slate-400 hover:text-slate-600 font-black text-sm">✕</button>
+            </div>
+            <div class="text-xs leading-relaxed space-y-1.5 text-slate-700">
+                <p>• 사람마다 사용하는 단위 물건(클립, 바둑돌 등)이 다르면, <strong>같은 물건이라도 개수가 다르게 나와서</strong> 정확하게 무게를 비교하기 어려워요!</p>
+                <p>• 그래서 세계 모든 사람이 똑같이 정해서 사용하는 <strong>표준 단위(g, kg)</strong>가 꼭 필요합니다.</p>
+            </div>
+            <button onclick="toggleHint()" class="w-full mt-2 py-1.5 bg-amber-400 hover:bg-amber-500 font-black font-jua text-amber-950 rounded-xl text-xs">
+                이해했어요!
+            </button>
+        </div>
+    </div>
+
+    <!-- 수평 성공 모달 -->
+    <div id="success-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-3xl max-w-sm w-full p-5 text-center space-y-3 shadow-2xl border-4 border-emerald-400">
+            <div class="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto text-2xl font-black shadow-inner">
+                🎉
+            </div>
+            <h3 class="text-lg font-black font-jua text-emerald-900">수평 맞추기 성공!</h3>
+            <p id="modal-desc" class="text-xs font-bold text-slate-700 leading-relaxed bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                <!-- 수평 성공 설명 -->
+            </p>
+            <div class="text-[11px] text-amber-900 font-semibold bg-amber-50 p-2 rounded-xl border border-amber-200">
+                💡 <strong>배운 점:</strong> 단위 물건 하나가 무거울수록 필요한 개수는 적어져요!
+            </div>
+            <button onclick="closeModal()" class="w-full py-2 bg-emerald-500 hover:bg-emerald-600 text-white font-black font-jua rounded-xl shadow transition text-xs">
+                확인하고 계속하기
+            </button>
+        </div>
+    </div>
+
+    <!-- 웹 오디오 사운드 효과 -->
+    <script>
+        let soundEnabled = true;
+        let audioCtx = null;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            const text = document.getElementById('sound-text');
+            const icon = document.getElementById('sound-icon');
+            if (soundEnabled) {
+                if (text) text.innerText = '소리 켜짐';
+                icon.setAttribute('data-lucide', 'volume-2');
+            } else {
+                if (text) text.innerText = '소리 끎';
+                icon.setAttribute('data-lucide', 'volume-x');
+            }
+            lucide.createIcons();
+        }
+
+        function playSound(type) {
+            if (!soundEnabled) return;
+            try {
+                initAudio();
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+
+                const now = audioCtx.currentTime;
+
+                if (type === 'add') {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(350, now);
+                    osc.frequency.exponentialRampToValueAtTime(700, now + 0.08);
+                    gain.gain.setValueAtTime(0.1, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+                    osc.start(now);
+                    osc.stop(now + 0.08);
+                } else if (type === 'remove') {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(500, now);
+                    osc.frequency.exponentialRampToValueAtTime(250, now + 0.08);
+                    gain.gain.setValueAtTime(0.1, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+                    osc.start(now);
+                    osc.stop(now + 0.08);
+                } else if (type === 'balanced') {
+                    [523.25, 659.25, 783.99, 1046.50].forEach((freq, idx) => {
+                        const noteOsc = audioCtx.createOscillator();
+                        const noteGain = audioCtx.createGain();
+                        noteOsc.type = 'triangle';
+                        noteOsc.frequency.setValueAtTime(freq, now + idx * 0.09);
+                        noteGain.gain.setValueAtTime(0.15, now + idx * 0.09);
+                        noteGain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.09 + 0.28);
+                        noteOsc.connect(noteGain);
+                        noteGain.connect(audioCtx.destination);
+                        noteOsc.start(now + idx * 0.09);
+                        noteOsc.stop(now + idx * 0.09 + 0.28);
+                    });
+                }
+            } catch (e) {
+                console.log('Audio error:', e);
+            }
+        }
+    </script>
+
+    <!-- 메인 앱 로직 -->
+    <script>
+        // 내부 상대 무게 정의 (화면 숫자 표기 완전 배제)
+        const TARGETS = {
+            eraser: { id: 'eraser', name: '지우개', weight: 24, icon: '🧽' },
+            tape: { id: 'tape', name: '투명테이프', weight: 60, icon: '🩹' }
+        };
+
+        const UNITS = {
+            clip: { id: 'clip', name: '클립', weight: 1, icon: '📎', color: 'bg-slate-50 border-slate-300' },
+            cube: { id: 'cube', name: '연결 큐브', weight: 2, icon: '🧊', color: 'bg-sky-50 border-sky-300' },
+            baduk: { id: 'baduk', name: '바둑돌', weight: 4, icon: '⚪', color: 'bg-emerald-50 border-emerald-300' },
+            gonggi: { id: 'gonggi', name: '공깃돌', weight: 6, icon: '🔴', color: 'bg-purple-50 border-purple-300' }
+        };
+
+        let currentTargetKey = 'eraser';
+        const unitCounts = { clip: 0, cube: 0, baduk: 0, gonggi: 0 };
+        let isBalanced = false;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+            renderUnitGridControls();
+            updateScaleUI();
+        });
+
+        function selectTarget(targetKey) {
+            currentTargetKey = targetKey;
+            
+            const eraserBtn = document.getElementById('target-eraser');
+            const tapeBtn = document.getElementById('target-tape');
+
+            if (targetKey === 'eraser') {
+                eraserBtn.className = "flex-1 sm:flex-initial px-3 py-1 rounded-lg text-xs font-black font-jua transition shadow-sm bg-white text-emerald-800 border-2 border-emerald-500 flex items-center justify-center gap-1";
+                tapeBtn.className = "flex-1 sm:flex-initial px-3 py-1 rounded-lg text-xs font-black font-jua transition text-slate-600 hover:bg-white/80 border-2 border-transparent flex items-center justify-center gap-1";
+            } else {
+                tapeBtn.className = "flex-1 sm:flex-initial px-3 py-1 rounded-lg text-xs font-black font-jua transition shadow-sm bg-white text-amber-800 border-2 border-amber-500 flex items-center justify-center gap-1";
+                eraserBtn.className = "flex-1 sm:flex-initial px-3 py-1 rounded-lg text-xs font-black font-jua transition text-slate-600 hover:bg-white/80 border-2 border-transparent flex items-center justify-center gap-1";
+            }
+
+            document.getElementById('label-left-name').innerText = TARGETS[targetKey].name;
+            isBalanced = false;
+            updateScaleUI();
+        }
+
+        function renderUnitGridControls() {
+            const gridEl = document.getElementById('unit-controls-grid');
+            gridEl.innerHTML = '';
+
+            Object.values(UNITS).forEach(unit => {
+                const card = document.createElement('div');
+                card.className = `${unit.color} border-2 p-1.5 rounded-xl flex items-center justify-between gap-1 shadow-sm`;
+
+                card.innerHTML = `
+                    <div class="flex items-center gap-1 min-w-[70px]">
+                        <span class="text-lg md:text-xl">${unit.icon}</span>
+                        <div>
+                            <div class="font-black font-jua text-xs text-slate-900">${unit.name}</div>
+                            <div class="text-[10px] text-slate-500 font-bold"><span id="unit-val-${unit.id}" class="text-teal-700 font-black">0</span>개</div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-0.5">
+                        <button onclick="changeUnitCount('${unit.id}', -5)" class="px-1.5 py-0.5 bg-white hover:bg-rose-50 text-rose-600 border border-slate-200 rounded-md text-[10px] font-black active:scale-95 transition shadow-2xs">-5</button>
+                        <button onclick="changeUnitCount('${unit.id}', -1)" class="px-1.5 py-0.5 bg-white hover:bg-rose-50 text-rose-600 border border-slate-200 rounded-md text-[10px] font-black active:scale-95 transition shadow-2xs">-1</button>
+                        <button onclick="changeUnitCount('${unit.id}', 1)" class="px-1.5 py-0.5 bg-teal-500 hover:bg-teal-600 text-white rounded-md text-[10px] font-black active:scale-95 transition shadow-2xs">+1</button>
+                        <button onclick="changeUnitCount('${unit.id}', 5)" class="px-1.5 py-0.5 bg-teal-600 hover:bg-teal-700 text-white rounded-md text-[10px] font-black active:scale-95 transition shadow-2xs">+5</button>
+                        <button onclick="changeUnitCount('${unit.id}', 10)" class="px-1.5 py-0.5 bg-teal-800 hover:bg-teal-900 text-white rounded-md text-[10px] font-black active:scale-95 transition shadow-2xs">+10</button>
+                    </div>
+                `;
+                gridEl.appendChild(card);
+            });
+        }
+
+        function changeUnitCount(unitId, delta) {
+            const current = unitCounts[unitId] || 0;
+            const updated = Math.max(0, current + delta);
+            
+            if (updated !== current) {
+                unitCounts[unitId] = updated;
+                playSound(delta > 0 ? 'add' : 'remove');
+                updateScaleUI();
+            }
+        }
+
+        function resetScale() {
+            Object.keys(unitCounts).forEach(k => unitCounts[k] = 0);
+            isBalanced = false;
+            playSound('remove');
+            updateScaleUI();
+        }
+
+        function updateScaleUI() {
+            const target = TARGETS[currentTargetKey];
+            const targetWeight = target.weight;
+
+            let totalUnitWeight = 0;
+            Object.keys(unitCounts).forEach(id => {
+                totalUnitWeight += unitCounts[id] * UNITS[id].weight;
+            });
+
+            // 조작부 개수 텍스트 업데이트
+            Object.keys(UNITS).forEach(id => {
+                const countEl = document.getElementById(`unit-val-${id}`);
+                if (countEl) countEl.innerText = unitCounts[id];
+            });
+
+            // 왼쪽 접시 렌더링
+            const leftPanEl = document.getElementById('left-plate-html');
+            leftPanEl.innerHTML = `
+                <div class="item-pop bg-white/90 border border-emerald-300 shadow px-2 py-0.5 rounded-lg flex items-center gap-1 font-jua text-xs text-emerald-950">
+                    <span class="text-base">${target.icon}</span>
+                    <span>${target.name}</span>
+                </div>
+            `;
+
+            // 오른쪽 접시 렌더링
+            const rightPanEl = document.getElementById('right-plate-html');
+            rightPanEl.innerHTML = '';
+
+            Object.keys(unitCounts).forEach(unitId => {
+                const count = unitCounts[unitId];
+                const unit = UNITS[unitId];
+
+                if (count > 0) {
+                    if (count <= 6) {
+                        for (let i = 0; i < count; i++) {
+                            const iconEl = document.createElement('span');
+                            iconEl.className = 'item-pop text-sm inline-block';
+                            iconEl.innerText = unit.icon;
+                            rightPanEl.appendChild(iconEl);
+                        }
+                    } else {
+                        const chip = document.createElement('div');
+                        chip.className = 'item-pop bg-white border border-teal-300 shadow-2xs px-1.5 py-0.5 rounded-md flex items-center gap-0.5 font-bold text-[10px] text-teal-900';
+                        chip.innerHTML = `<span>${unit.icon}</span><span class="font-black">x${count}</span>`;
+                        rightPanEl.appendChild(chip);
+                    }
+                }
+            });
+
+            // 저울 기울임 회전 각도 계산
+            const beamEl = document.getElementById('beam-group');
+            const leftPanGroup = document.getElementById('pan-group-left');
+            const rightPanGroup = document.getElementById('pan-group-right');
+            const statusEl = document.getElementById('scale-status');
+
+            const weightDiff = targetWeight - totalUnitWeight;
+            let angle = 0;
+
+            if (weightDiff !== 0) {
+                // 최대 기울기를 ±11도 이내로 클램핑하여 화면 밖으로 잘림 차단
+                angle = Math.min(Math.max(weightDiff * 0.35, -11), 11);
+            }
+
+            // 저울 대 회전 및 접시 상시 평행 유지
+            beamEl.style.transform = `rotate(${angle}deg)`;
+            leftPanGroup.style.transform = `rotate(${-angle}deg)`;
+            rightPanGroup.style.transform = `rotate(${-angle}deg)`;
+
+            // 수평 및 상태 안내 텍스트
+            if (totalUnitWeight === 0) {
+                statusEl.className = "bg-slate-100 text-slate-700 px-3 py-1 rounded-full text-xs font-black border border-slate-200 flex items-center gap-1 shadow-sm font-jua flex-1 sm:flex-initial justify-center";
+                statusEl.innerHTML = `<span class="w-2 h-2 rounded-full bg-slate-400"></span> 오른쪽 접시에 단위 물건을 올려놓아 보세요!`;
+                isBalanced = false;
+            } 
+            else if (targetWeight === totalUnitWeight) {
+                statusEl.className = "bg-emerald-500 text-white px-4 py-1 rounded-full text-xs font-black shadow-md flex items-center gap-1 animate-bounce font-jua flex-1 sm:flex-initial justify-center";
+                statusEl.innerHTML = `🎉 수평 완료! ${target.name}의 무게와 같습니다!`;
+
+                if (!isBalanced) {
+                    isBalanced = true;
+                    playSound('balanced');
+                    triggerConfetti();
+                    showSuccessModal(target);
+                }
+            } 
+            else if (targetWeight > totalUnitWeight) {
+                statusEl.className = "bg-sky-100 text-sky-900 px-3 py-1 rounded-full text-xs font-black border border-sky-300 flex items-center gap-1 shadow-sm font-jua flex-1 sm:flex-initial justify-center";
+                statusEl.innerHTML = `👈 ${target.name} 쪽이 더 무겁습니다. 단위 물건을 더 올리세요!`;
+                isBalanced = false;
+            } 
+            else {
+                statusEl.className = "bg-amber-100 text-amber-900 px-3 py-1 rounded-full text-xs font-black border border-amber-300 flex items-center gap-1 shadow-sm font-jua flex-1 sm:flex-initial justify-center";
+                statusEl.innerHTML = `단위 물건 쪽이 더 무겁습니다. 수량을 줄여보세요! 👉`;
+                isBalanced = false;
+            }
+        }
+
+        function showSuccessModal(target) {
+            const modal = document.getElementById('success-modal');
+            const desc = document.getElementById('modal-desc');
+
+            const activeUnits = Object.keys(unitCounts)
+                .filter(id => unitCounts[id] > 0)
+                .map(id => `<strong>${UNITS[id].name} ${unitCounts[id]}개</strong>`)
+                .join(', ');
+
+            desc.innerHTML = `양팔저울이 평평하게 수평을 이루었습니다!<br><br>수평 성공: <span class="text-emerald-700 font-extrabold">[${target.name}]</span> 의 무게는 <br><span class="text-teal-700 font-extrabold">[${activeUnits}]</span> 와(과) 같습니다!`;
+            modal.classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('success-modal').classList.add('hidden');
+        }
+
+        function toggleHint() {
+            const overlay = document.getElementById('hint-overlay');
+            overlay.classList.toggle('hidden');
+        }
+
+        function triggerConfetti() {
+            confetti({
+                particleCount: 65,
+                spread: 75,
+                origin: { y: 0.6 }
+            });
+        }
+    </script>
+</body>
+</html>
